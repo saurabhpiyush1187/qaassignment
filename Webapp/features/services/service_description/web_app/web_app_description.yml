@@ -1,0 +1,48 @@
+list_devices:
+  method: GET
+  endpoint: "/devices"
+  queryparams: None
+  headers: None
+  payload: None
+  target_url: None
+
+disconnect_device:
+  method: POST
+  endpoint: "/disconnect"
+  queryparams: None
+  headers: None
+  payload: None
+  target_url: None
+
+check_state:
+  method: GET
+  endpoint: "/state"
+  queryparams: None
+  headers: None
+  payload: None
+  target_url: None
+
+
+connect_device1:
+  method: POST
+  endpoint: "/connect"
+  queryparams: None
+  headers: {'Content-Type':'application/json'}
+  payload: "connect_device1.json"
+  target_url: None
+
+connect_device2:
+  method: POST
+  endpoint: "/connect"
+  queryparams: None
+  headers: {'Content-Type':'application/json'}
+  payload: "connect_device2.json"
+  target_url: None
+
+property_change:
+  method: POST
+  endpoint: "/pstr_property"
+  queryparams: None
+  headers: {'Content-Type':'application/json'}
+  payload: None
+  target_url: None

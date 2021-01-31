@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>basic.html</h1>
+    <p>Report generated on 31-Jan-2021 at 16:40:33 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.9.0", "pytest": "6.2.2"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.17763-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"allure-pytest": "2.7.0", "bdd": "3.1.0", "forked": "1.3.0", "html": "3.1.1", "metadata": "1.11.0", "parallel": "0.0.9", "xdist": "1.28.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.7.9</td></tr></table>
+    <h2>Summary</h2>
+    <p>27 tests ran in 125.35 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">17 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">10 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_back_to_10</td>
+          <td class="col-duration">7.09</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">request = &lt;FixtureRequest for &lt;Function test_change_brightness_back_to_10&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change brightness back to 10&#x27;)<br/>&gt;   def test_change_brightness_back_to_10():<br/><br/>features\test_web_app_api_steps.py:19: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>    @then(&#x27;the changed brightness10 should be reflected in the state&#x27;)<br/>    def the_changed_brightness_should_be_reflected_in_the_state_10():<br/>        &quot;&quot;&quot;the changed brightness should be reflected in the state.&quot;&quot;&quot;<br/>        assert web_app.get_state()<br/>&gt;       assert web_app.check_value_in_state(&quot;brightness&quot;,&quot;10&quot;)<br/><span class="error">E       AssertionError: assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_value_in_state of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;brightness&#x27;, &#x27;10&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_value_in_state of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_value_in_state</span><br/><br/>features\test_web_app_api_steps.py:184: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Changing brightness to 5...
+Successfully changed the brightness of device1{&quot;brightness&quot;:&quot;5&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+5.0 successfully verified in the state
+Changing brightness to 10...
+Unable to changebrightness of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+10.0 not successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_device_false[a-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.06</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, brightness = &#x27;a&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_brightness_of_the_device_false[a-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change brightness of the device- false&#x27;)<br/>&gt;   def test_change_brightness_of_the_device_false():<br/><br/>features\test_web_app_api_steps.py:24: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Response code500
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_device_false[-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, brightness = &#x27;&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_brightness_of_the_device_false[-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change brightness of the device- false&#x27;)<br/>&gt;   def test_change_brightness_of_the_device_false():<br/><br/>features\test_web_app_api_steps.py:24: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Response code500
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_device_false[%^&amp;*%^*%-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, brightness = &#x27;%^&amp;*%^*%&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_brightness_of_the_device_false[%^&amp;*%^*%-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change brightness of the device- false&#x27;)<br/>&gt;   def test_change_brightness_of_the_device_false():<br/><br/>features\test_web_app_api_steps.py:24: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Response code500
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_color_of_the_device__false[0000-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, color = &#x27;0000&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_color_of_the_device__false[0000-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change color of the device - false&#x27;)<br/>&gt;   def test_change_color_of_the_device__false():<br/><br/>features\test_web_app_api_steps.py:34: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the color of device1{&quot;color&quot;:&quot;0000&quot;}
+Response code{&#x27;success&#x27;: True}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_name_of_the_devicefalse[-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.04</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, name = &#x27;&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_name_of_the_devicefalse[-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change name of the device-false&#x27;)<br/>&gt;   def test_change_name_of_the_devicefalse():<br/><br/>features\test_web_app_api_steps.py:44: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the name of device1{&quot;name&quot;:&quot;&quot;}
+Response code{&#x27;success&#x27;: True}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_name_of_the_devicefalse[67888-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, name = &#x27;67888&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_name_of_the_devicefalse[67888-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change name of the device-false&#x27;)<br/>&gt;   def test_change_name_of_the_devicefalse():<br/><br/>features\test_web_app_api_steps.py:44: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the name of device1{&quot;name&quot;:&quot;67888&quot;}
+Response code{&#x27;success&#x27;: True}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_name_of_the_devicefalse[-1-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.04</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, name = &#x27;-1&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_name_of_the_devicefalse[-1-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change name of the device-false&#x27;)<br/>&gt;   def test_change_name_of_the_devicefalse():<br/><br/>features\test_web_app_api_steps.py:44: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the name of device1{&quot;name&quot;:&quot;-1&quot;}
+Response code{&#x27;success&#x27;: True}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_name_of_the_devicefalse[%^&amp;*%^*%-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">4.09</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">result = &#x27;{&quot;success&quot;: False}&#x27;, name = &#x27;%^&amp;*%^*%&#x27;, request = &lt;FixtureRequest for &lt;Function test_change_name_of_the_devicefalse[%^&amp;*%^*%-{&quot;success&quot;: False}]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Change name of the device-false&#x27;)<br/>&gt;   def test_change_name_of_the_devicefalse():<br/><br/>features\test_web_app_api_steps.py:44: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>result = &#x27;{&quot;success&quot;: False}&#x27;<br/><br/>    @then(&#x27;the response should be &lt;result&gt;&#x27;)<br/>    def the_response_should_be_result(result):<br/>        &quot;&quot;&quot;the response should be &lt;result&gt;.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_response(result)<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;(&#x27;{&quot;success&quot;: False}&#x27;)</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_response of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_response</span><br/><br/>features\test_web_app_api_steps.py:190: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the name of device1{&quot;name&quot;:&quot;%^&amp;*%^*%&quot;}
+Response code{&#x27;success&#x27;: True}
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_store_property_after_reconnecting_to_the_device[ff0000-5-Bulb_newname]</td>
+          <td class="col-duration">9.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">brightness = &#x27;5&#x27;, color = &#x27;ff0000&#x27;, name = &#x27;Bulb_newname&#x27;, request = &lt;FixtureRequest for &lt;Function test_store_property_after_reconnecting_to_the_device[ff0000-5-Bulb_newname]&gt;&gt;<br/><br/>    @scenario(r&#x27;tests&#x27; + os.sep + &#x27;webapp&#x27;  + os.sep + &#x27;web_app_api.feature&#x27;, &#x27;Store property after re-connecting to the device&#x27;)<br/>&gt;   def test_store_property_after_reconnecting_to_the_device():<br/><br/>features\test_web_app_api_steps.py:54: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:195: in _execute_scenario<br/>    _execute_step_function(request, scenario, step, step_func)<br/>..\..\AppData\Roaming\Python\Python37\site-packages\pytest_bdd\scenario.py:136: in _execute_step_function<br/>    step_func(**kwargs)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>    @then(&#x27;the user should be able to see the changes in the connected device&#x27;)<br/>    def the_user_should_be_able_to_see_the_changes_in_the_connected_device():<br/>        &quot;&quot;&quot;the user should be able to see the changes in the connected device.&quot;&quot;&quot;<br/>&gt;       assert web_app.check_value_after_reconnect()<br/><span class="error">E       assert False</span><br/><span class="error">E        +  where False = &lt;bound method WebApp.check_value_after_reconnect of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt;()</span><br/><span class="error">E        +    where &lt;bound method WebApp.check_value_after_reconnect of &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;&gt; = &lt;features.services.WebApp.web_app_api.WebApp object at 0x000001FDD9458208&gt;.check_value_after_reconnect</span><br/><br/>features\test_web_app_api_steps.py:214: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Successfully changed the color of device1{&quot;color&quot;:&quot;ff0000&quot;}
+Successfully changed the brightness of device1{&quot;brightness&quot;:&quot;5&quot;}
+Successfully changed the name of device1{&quot;name&quot;:&quot;Bulb_newname&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Expected result---&gt;{&#x27;name&#x27;: &#x27;Bulb_newname&#x27;, &#x27;ip&#x27;: &#x27;192.168.100.10&#x27;, &#x27;color&#x27;: &#x27;ff0000&#x27;, &#x27;brightness&#x27;: 5.0}
+Actual result---&gt;{&#x27;name&#x27;: &#x27;Bulb_newname&#x27;, &#x27;ip&#x27;: &#x27;192.168.100.10&#x27;, &#x27;color&#x27;: &#x27;ff0000&#x27;, &#x27;brightness&#x27;: 10.0}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_verify_list_of_devices_in_my_network</td>
+          <td class="col-duration">1.02</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>[{&#x27;name&#x27;: &#x27;Bulb_newname&#x27;, &#x27;ip&#x27;: &#x27;192.168.100.10&#x27;}, {&#x27;name&#x27;: &#x27;%^&amp;*%^*%&#x27;, &#x27;ip&#x27;: &#x27;192.168.100.11&#x27;}]
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_device_false[11-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">5.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Unable to changebrightness of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+Response successfully matched with {&quot;success&quot;: False}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+11.0 not successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_device_false[-1-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">5.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Unable to changebrightness of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+Response successfully matched with {&quot;success&quot;: False}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+-1.0 not successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_devicetrue[0-{&quot;success&quot;: True}]</td>
+          <td class="col-duration">5.10</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the brightness of device1{&quot;brightness&quot;:&quot;0&quot;}
+Response successfully matched with {&quot;success&quot;: True}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+0.0 successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_devicetrue[10-{&quot;success&quot;: True}]</td>
+          <td class="col-duration">5.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the brightness of device1{&quot;brightness&quot;:&quot;10&quot;}
+Response successfully matched with {&quot;success&quot;: True}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+10.0 successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_brightness_of_the_devicetrue[5-{&quot;success&quot;: True}]</td>
+          <td class="col-duration">5.06</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the brightness of device1{&quot;brightness&quot;:&quot;5&quot;}
+Response successfully matched with {&quot;success&quot;: True}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+5.0 successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_color_of_the_device__false[a-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">5.06</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Unable to changecolor of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+Response successfully matched with {&quot;success&quot;: False}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+a not successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_color_of_the_device__false[10-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">5.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Unable to changecolor of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+Response successfully matched with {&quot;success&quot;: False}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+10 not successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_color_of_the_device__false[-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">5.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Unable to changecolor of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+Response successfully matched with {&quot;success&quot;: False}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+ not successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_color_of_the_device__false[%^&amp;*%^*%-{&quot;success&quot;: False}]</td>
+          <td class="col-duration">5.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Unable to changecolor of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+Response successfully matched with {&quot;success&quot;: False}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+%^&amp;*%^*% not successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_color_of_the_device__true[#ff0000-{&quot;success&quot;: True}]</td>
+          <td class="col-duration">5.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the color of device1{&quot;color&quot;:&quot;#ff0000&quot;}
+Response successfully matched with {&quot;success&quot;: True}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+#ff0000 successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_change_name_of_the_devicetrue[bulb56-{&quot;success&quot;: True}]</td>
+          <td class="col-duration">5.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+Successfully changed the name of device1{&quot;name&quot;:&quot;bulb56&quot;}
+Response successfully matched with {&quot;success&quot;: True}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+bulb56 successfully verified in the state
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_verify_connection_to_a_device</td>
+          <td class="col-duration">5.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Trying to connect 2 devices at once
+Unable to connect to device2{&quot;ip&quot;: &quot;192.168.100.11&quot;}
+Disconnected successully from devices
+Successfully connected to device2{&quot;ip&quot;: &quot;192.168.100.11&quot;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_verify_state_of_a_device</td>
+          <td class="col-duration">3.04</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Successfully connected to device1{&quot;ip&quot;: &quot;192.168.100.10&quot;}
+Getting device state..matching keys
+name matched
+Getting device state..matching keys
+ip matched
+Getting device state..matching keys
+color matched
+Getting device state..matching keys
+brightness matched
+State verified successfully of the device 192.168.100.10
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_verify_state_of_a_device_when_disconnected_from_the_device[brightness-5]</td>
+          <td class="col-duration">3.03</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Trying to get status with device disconnected
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unable to get state of the device..Device may be disconnected
+Trying to change property with device disconnected
+Unable to changebrightness of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_verify_state_of_a_device_when_disconnected_from_the_device[color-#ff000]</td>
+          <td class="col-duration">3.03</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Trying to get status with device disconnected
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unable to get state of the device..Device may be disconnected
+Trying to change property with device disconnected
+Unable to changecolor of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">features/test_web_app_api_steps.py::test_verify_state_of_a_device_when_disconnected_from_the_device[name-eureka]</td>
+          <td class="col-duration">3.04</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>Disconnected successully from devices
+Trying to get status with device disconnected
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unknown keys in the state
+{&#x27;success&#x27;: False}
+Unable to get state of the device..Device may be disconnected
+Trying to change property with device disconnected
+Unable to changename of the device..Device may be disconnected or incorrect value
+Return Message is {&#x27;success&#x27;: False}
+<br/></div></td></tr></tbody></table></body></html>

@@ -1,0 +1,10 @@
+'env':
+  'dev':
+    'local':
+      'base_url': 'http://localhost:8080'
+'environment': 'http://localhost:8080'
+'environment_type': 'local'
+'execution_environment': 'dev'
+'service_description': 'services/service_description'
+'service_payloads': 'services/payloads'
+'overwrite_base_url' : false
