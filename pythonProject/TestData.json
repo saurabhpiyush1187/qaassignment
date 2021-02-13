@@ -1,0 +1,15 @@
+{
+    "page_urls":[
+    {
+        "create_board": "https://sprintboards.io/boards/create",
+        "board_page" : "https://sprintboards.io/boards"
+    }
+    ],
+    "create-board_data":[
+    {
+        "session_name": "My first board",
+        "owner" : "Sennder",
+        "success_message":"Created"
+    }
+    ]
+}
